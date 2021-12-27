@@ -29,8 +29,10 @@ class UserButton:
         curr_user,
         on_click,
         image=None,
+        bot=False,
     ):
         self.curr_user = curr_user
+        self.bot = bot
 
         self.w, self.h = w, h
         self.on_click = on_click
@@ -47,7 +49,9 @@ class UserButton:
 
         self.button_style["font_color"] = self.text_color
 
-        self.button_style["tags"] = ["you"] if self.curr_user else []
+        self.button_style["tags"] = ["YOU"] if self.curr_user else []
+        if self.bot:
+            self.button_style["tags"].append("BOT")
 
         self.button = Button(
             self.rect,
@@ -100,6 +104,9 @@ class UserButton:
                 255 - c for c in self.avg_color
             ]  # create a stand out text color
             self.button_style["font_color"] = self.text_color
+
+        if changed.get("bot") is True:
+            self.button_style["tags"].append("BOT")
 
         self.button = Button(
             self.rect,
@@ -315,6 +322,7 @@ class UserButton_Container:
             curr_user,
             on_click,
             image=user.get("image"),
+            bot=user.get("bot"),
         )
 
         self.user_buttons[user["id"]] = btn
