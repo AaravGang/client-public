@@ -6,7 +6,7 @@ Online Tic Tac Toe and Connect4.
 
 If you dont have python3 installed, then go to https://www.python.org/downloads/ and install `python3.8` or `python3.9`. cuz I'm not sure if it'll work on other versions.
 
-Once you have that, download this client folder's zip on your `Desktop` and unzip it. (It will prolly be named `client-main`, rename it to `client`)
+Once you have that, download this client folder's zip on your `Desktop` and unzip it. (It will prolly be named `client-public-main`, rename it to `client`)
 
 Next, Open a new terminal or command prompt, and paste in the following commands:
 
