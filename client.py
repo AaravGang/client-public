@@ -249,7 +249,7 @@ def quit_game(button=None, **kwargs):
 # move/place a piece
 def move(button=None, *args, **kwargs):
     move_req = {}
-    move_req["move"] = button.id
+    move_req["move"] = {"game_id": game_details["game_id"], "move": button.id}
     send(move_req)
 
 
