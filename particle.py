@@ -8,7 +8,6 @@ class Vector:
         self.x = x
         self.y = y
         self.pos = numpy.array([x, y])
-     
 
     @staticmethod
     def random2D():
@@ -32,9 +31,10 @@ class Vector:
         self.x = self.pos[0]
         self.y = self.pos[1]
 
+
 # a wrapper class for vector, that has all the cool stuff
 class Particle:
-    def __init__(self, x, y, color, firework, radius,fade=10):
+    def __init__(self, x, y, color, firework, radius, fade=10):
         self.pos = Vector(x, y)
         self.firework = firework
         self.fade = fade
@@ -42,7 +42,7 @@ class Particle:
         self.acc = Vector(0, 0)
         self.color = color
         self.surf = pygame.Surface((radius, radius), pygame.SRCALPHA)
-        self.surf.set_colorkey((0,0,0))
+        self.surf.set_colorkey((0, 0, 0))
         self.surf.set_alpha(255)
         self.colors = []
         self.lasts = []
@@ -58,7 +58,7 @@ class Particle:
 
     def create_alpha_colors(self):
         for i in range(self.fade):
-            self.colors.append((*self.color,255//(self.fade-i+1)))
+            self.colors.append((*self.color, 255 // (self.fade - i + 1)))
 
     def update_list(self):
         self.lasts.append(self.pos.pos)
@@ -86,15 +86,15 @@ class Particle:
         return False
 
     def show(self, win):
-        
+
         if not self.firework:
             self.surf.set_alpha(self.lifespan)
         self.surf.fill(self.color)
 
         for i in range(len(self.lasts)):
-                pos = self.lasts[i]
-                c_color = self.colors[i]
-                self.surf.fill(c_color)
-                win.blit(self.surf, tuple(pos))
+            pos = self.lasts[i]
+            c_color = self.colors[i]
+            self.surf.fill(c_color)
+            win.blit(self.surf, tuple(pos))
         win.blit(self.surf, (self.pos.x, self.pos.y))
 

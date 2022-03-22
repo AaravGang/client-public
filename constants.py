@@ -97,6 +97,7 @@ class Fonts:
     subtitle_font = pygame.font.Font(f"{default_font_path}/TimesNewRomanBold.ttf", 25,)
     notification_font = pygame.font.Font(f"{default_font_path}/Arial.ttf", 20,)
     small_font = pygame.font.Font(f"{default_font_path}/Arial.ttf", 15)
+    huge_font = pygame.font.Font(f"{default_font_path}/ComicSansMSBold.ttf", 69)
 
 
 # All the button styles
