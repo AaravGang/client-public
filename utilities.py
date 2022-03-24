@@ -1464,7 +1464,11 @@ class Game_Template:
 
             def on_bg_close(*args, **kwargs):
                 self.show_animated_bg = False
-                Sound_Effects.celebration.stop()
+                try:
+                    Sound_Effects.celebration.stop()
+                except:
+                    pass
+
                 if saved_settings["play_music"]:
                     pygame.mixer.music.unpause()
 
@@ -1482,7 +1486,11 @@ class Game_Template:
 
             def on_bg_close(*args, **kwargs):
                 self.show_animated_bg = False
-                Sound_Effects.mourn.stop()
+                try:
+                    Sound_Effects.mourn.stop()
+                except:
+                    pass
+
                 if saved_settings["play_music"]:
                     pygame.mixer.music.unpause()
 

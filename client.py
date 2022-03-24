@@ -101,44 +101,17 @@ def recieve_active_users():
     write(WINDOW, f"Recieving other users from server. - {0}%", WIDTH / 2, HEIGHT / 2)
 
     try:
-        data = n.recv()
-        size = data["active_users"][
-            "size"
-        ]  # recieve the number of bytes the server is gonna send
-        full_bytes = b""
+        active_users = n.recv()
 
-        bytes_chunck = ""  # image will come in as bytes
-        server_down = False
-        while len(full_bytes) != size:
-            if len(full_bytes) > size:
-                raise Exception("SOMETHING WENT WRONG!")
-
-            bytes_chunck = n.recv(2048, False)
-            # user has disconnected
-            if not bytes_chunck:
-                server_down = True
-                break
-            full_bytes += bytes_chunck
-
-            WINDOW.fill(Colors.BLACK)
-            write(
-                WINDOW,
-                f"Recieving other users from server. - {round(len(full_bytes)/size * 100)}%",
-                WIDTH / 2,
-                HEIGHT / 2,
-            )
-
-        if server_down:
+        if not active_users:
             raise Exception("SERVER CRASHED UNEXPECTEDLY")
-
-        active_users = json.loads(full_bytes.decode("utf-8"))
 
         return active_users
 
     except Exception as e:
         global run
         print("COULD NOT GET ACTIVE USRERS FROM SERVER.", e)
-        print("DATA RECIEVED WAS: ", data)
+        print("DATA RECIEVED WAS: ", active_users)
         run = False
 
 
@@ -260,6 +233,17 @@ def send_update_details_request(changed, *args, **kwargs):
     send(req)
 
 
+def upload_screen(batch_number, n_batches):
+    check_quit()
+    WINDOW.fill(Colors.BLACK)
+    write(
+        WINDOW,
+        f"Uploading Image - {round((batch_number)/n_batches * 100)}%",
+        WIDTH / 2,
+        HEIGHT / 2,
+    )
+
+
 # send an image in batches
 def send_image(img):
     WINDOW.fill(Colors.BLACK)
@@ -278,22 +262,12 @@ def send_image(img):
         popups["error"].add_popup("Error", allowed.get("error"), text_color=Colors.RED)
 
     else:
-        time.sleep(1)
 
-        # print("started sending image")
-        # send the image bytes
-        for batch in range(0, size, 2048):
-            check_quit()
-            send(image_bytes[batch : batch + 2048], pickle_data=False)
-            WINDOW.fill(Colors.BLACK)
-            write(
-                WINDOW,
-                f"Uploading Image - {round((batch+2048)/size * 100)}%",
-                WIDTH / 2,
-                HEIGHT / 2,
-            )
+        print("started sending image")
 
-        # print("done sending image")
+        n.send(image_bytes, pickle_data=False, fn=upload_screen)
+
+        print("done sending image")
 
 
 # what happens when the user changes profile pic
@@ -384,162 +358,160 @@ def check_quit():
                 quit()
 
 
+def on_recieve(data):
+    global displays, current_display, game_details, active_game, game_board, run, ind, active_profile, challenge_form, popup
+
+    sound_to_play = None
+    # no data recieved - server is likely down.
+    if not data:
+        print("SERVER DOWN. OR CONNECTION LOST.")
+        run = False
+        return True
+
+    # a new user has connected
+    if data.get("connected"):
+        # data["connected"] is the details of that user
+        # add the user to all required dicts
+        add_user(data["connected"])
+
+    # someone has disconnected
+    if data.get("disconnected"):
+        # data["disconnected"] is the id of that user
+        # remove that user from all dicts
+        del_user(data["disconnected"])
+
+    # recieved a message
+    if data.get("message"):
+        # default props for the message
+        popup_props = {
+            "title": data["message"]["title"],
+            "button_props": [],
+        }
+
+        # add the props for the message (if any)
+        if data["message"].get("buttons"):
+            for b in data["message"]["buttons"]:
+                popup_props["button_props"].append(default_buttons[b])
+
+        if data["message"].get("text"):
+            popup_props["text"] = data["message"]["text"]
+
+        if data["message"].get("context"):
+            popup_props["context"] = data["message"]["context"]
+
+        if data["message"].get("closeable") is not None:
+            popup_props["closeable"] = data["message"].get("closeable")
+
+        if data["message"].get("id") is not None:
+            popup_props["id"] = data["message"].get("id")
+
+        # add the message to the messages section
+        popups["message"].add_popup(**popup_props)
+
+        sound_to_play = Sound_Effects.message
+
+    # recieved an error message
+    if data.get("error"):
+        popups["error"].add_popup(
+            "Error", data["error"], text_color=Colors.RED,
+        )
+        sound_to_play = Sound_Effects.error
+
+    # new game started
+    if data.get("new_game"):
+        game_details = data["new_game"]["details"]  # {game_id, board}
+        game_name = data["new_game"]["game"]  # game name
+
+        # setup the game accordingly
+        if game_name == "tic_tac_toe":
+            game_board = TTT_Board(
+                X_id=game_details["board"].X_id,
+                O_id=game_details["board"].O_id,
+                on_button_click=move,
+                rows=game_details["board"].rows,
+                cols=game_details["board"].cols,
+            )
+        elif game_name == "connect4":
+            game_board = Connect4_Board(
+                curr_user_id,
+                game_details["board"].red_id,
+                game_details["board"].blue_id,
+                on_button_click=move,
+                rows=game_details["board"].rows,
+                cols=game_details["board"].cols,
+            )
+
+        # create a wrapper for the game board
+        active_game = Game_Template(
+            curr_user_id,
+            data["new_game"]["players"],
+            data["new_game"]["identification_dict"],
+            game_details["board"].turn_id,
+            game_name,
+            game_board,
+            on_quit=quit_game,
+        )
+
+        add_page("game")
+        sound_to_play = Sound_Effects.game_start
+
+    # someone has moved,update on this screen
+    if data.get("moved"):
+        game_board.place(data["moved"]["to"], data["moved"]["turn_string"])
+        active_game.set_turn(data["moved"]["turn_id"])
+        sound_to_play = Sound_Effects.select
+
+    # game over
+    if data.get("game_over"):
+        sound_to_play = None
+
+        active_game.game_over_protocol(data["game_over"])
+
+    # a user has updated their profile image
+
+    if data.get("image"):
+        size, shape, dtype, id = (
+            data["image"]["size"],
+            data["image"]["shape"],
+            data["image"]["dtype"],
+            data["image"]["user_id"],
+        )
+
+        # print("Total image bytes supposed to be recieved:", size)
+
+        full_image = n.recv(load=False)
+        
+
+        if full_image == "":  # server down
+            run = False
+            return True
+
+        # print("Total image bytes recieved: ", len(full_image))
+
+        image = np.frombuffer(full_image, dtype=dtype).reshape(*shape)
+        surf = pygame.surfarray.make_surface(image)
+        changed = {"image": surf}
+        update_user(id, changed)
+
+    # update a user's details
+    if data.get("updated"):
+        update_user(data["updated"]["user_id"], data["updated"]["changed"])
+
+    if saved_settings["sound_effects"] and sound_to_play:
+        sound_to_play.play()
+
+    sound_to_play = None
+
+
 # recieve some data from the server
 def recieve():
     global displays, current_display, game_details, active_game, game_board, run, ind, active_profile, challenge_form, popup
     while run:
-
         data = n.recv()
-        sound_to_play = None
-        # no data recieved - server is likely down.
-        if not data:
-            print("SERVER DOWN. OR CONNECTION LOST.")
-            run = False
+        done = on_recieve(data)
+
+        if done:
             break
-
-        # a new user has connected
-        if data.get("connected"):
-            # data["connected"] is the details of that user
-            # add the user to all required dicts
-            add_user(data["connected"])
-
-        # someone has disconnected
-        if data.get("disconnected"):
-            # data["disconnected"] is the id of that user
-            # remove that user from all dicts
-            del_user(data["disconnected"])
-
-        # recieved a message
-        if data.get("message"):
-            # default props for the message
-            popup_props = {
-                "title": data["message"]["title"],
-                "button_props": [],
-            }
-
-            # add the props for the message (if any)
-            if data["message"].get("buttons"):
-                for b in data["message"]["buttons"]:
-                    popup_props["button_props"].append(default_buttons[b])
-
-            if data["message"].get("text"):
-                popup_props["text"] = data["message"]["text"]
-
-            if data["message"].get("context"):
-                popup_props["context"] = data["message"]["context"]
-
-            if data["message"].get("closeable") is not None:
-                popup_props["closeable"] = data["message"].get("closeable")
-
-            if data["message"].get("id") is not None:
-                popup_props["id"] = data["message"].get("id")
-
-            # add the message to the messages section
-            popups["message"].add_popup(**popup_props)
-
-            sound_to_play = Sound_Effects.message
-
-        # recieved an error message
-        if data.get("error"):
-            popups["error"].add_popup(
-                "Error", data["error"], text_color=Colors.RED,
-            )
-            sound_to_play = Sound_Effects.error
-
-        # new game started
-        if data.get("new_game"):
-            game_details = data["new_game"]["details"]  # {game_id, board}
-            game_name = data["new_game"]["game"]  # game name
-
-            # setup the game accordingly
-            if game_name == "tic_tac_toe":
-                game_board = TTT_Board(
-                    X_id=game_details["board"].X_id,
-                    O_id=game_details["board"].O_id,
-                    on_button_click=move,
-                    rows=game_details["board"].rows,
-                    cols=game_details["board"].cols,
-                )
-            elif game_name == "connect4":
-                game_board = Connect4_Board(
-                    curr_user_id,
-                    game_details["board"].red_id,
-                    game_details["board"].blue_id,
-                    on_button_click=move,
-                    rows=game_details["board"].rows,
-                    cols=game_details["board"].cols,
-                )
-
-            # create a wrapper for the game board
-            active_game = Game_Template(
-                curr_user_id,
-                data["new_game"]["players"],
-                data["new_game"]["identification_dict"],
-                game_details["board"].turn_id,
-                game_name,
-                game_board,
-                on_quit=quit_game,
-            )
-
-            add_page("game")
-            sound_to_play = Sound_Effects.game_start
-
-        # someone has moved,update on this screen
-        if data.get("moved"):
-            game_board.place(data["moved"]["to"], data["moved"]["turn_string"])
-            active_game.set_turn(data["moved"]["turn_id"])
-            sound_to_play = Sound_Effects.select
-
-        # game over
-        if data.get("game_over"):
-            sound_to_play = None
-
-            active_game.game_over_protocol(data["game_over"])
-
-        # a user has updated their profile image
-
-        if data.get("image"):
-            size, shape, dtype, id = (
-                data["image"]["size"],
-                data["image"]["shape"],
-                data["image"]["dtype"],
-                data["image"]["user_id"],
-            )
-            full_image = b""
-            # print("Total image bytes supposed to be recieved:", size)
-
-            image_bytes = ""  # image will come in as bytes
-            server_down = False
-            while len(full_image) != size:
-                if len(full_image) > size:
-                    run = False
-                    print("supposed to recv:", size, "recvd:", len(full_image))
-                    raise Exception("SERVER CODE HAS A BUG IN SENDING IMAGE.")
-
-                image_bytes = n.recv(2048, False)
-                # user has disconnected
-                if not image_bytes:
-                    server_down = True
-                    break
-                full_image += image_bytes
-
-            if server_down:
-                continue
-
-            # print("Total image bytes recieved: ", len(full_image))
-            image = np.frombuffer(full_image, dtype=dtype).reshape(*shape)
-            surf = pygame.surfarray.make_surface(image)
-            changed = {"image": surf}
-            update_user(id, changed)
-
-        # update a user's details
-        if data.get("updated"):
-            update_user(data["updated"]["user_id"], data["updated"]["changed"])
-
-        if saved_settings["sound_effects"] and sound_to_play:
-            sound_to_play.play()
-
-        sound_to_play = None
 
 
 # draw everything
