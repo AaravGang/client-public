@@ -1,7 +1,7 @@
 import pygame as pg
 from constants import *
 
-
+# Modified button class picked up from a great github repo...
 class Button(object):
     """A fairly straight forward button class."""
 
@@ -210,4 +210,3 @@ class Button(object):
                 surface, Colors.PURPLE, r.inflate(5, 5), border_radius=2,
             )
             surface.blit(s, r)
-

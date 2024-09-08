@@ -1,5 +1,3 @@
-
-
 import pygame, json
 from pygame import mixer
 
@@ -213,4 +211,3 @@ class Button_Styles:
         "border_radius": 50,
         "click_sound": Sound_Effects.click,
     }
-

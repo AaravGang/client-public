@@ -60,6 +60,8 @@ class Network:
         data = None
         try:
             lenData = self.client.recv(2)
+            #print(struct.unpack("h", lenData))
+            
             if not lenData:
                 return ""  # server down
             lenData = struct.unpack("h", lenData)[
@@ -67,14 +69,19 @@ class Network:
             ]  # length of data will be padded to 2  bytes
             data = self.client.recv(lenData)
 
+
             try:
+                
                 pickled = pickle.loads(data)
+                
                 if isinstance(pickled, dict) and pickled.get("message_type") == "huge":
                     n_batches = pickled["n_batches"]
+                    print("batches:",n_batches)
                     binData = b""
                     batch_sizes = struct.unpack(
                         "h" * n_batches, self.client.recv(2 * n_batches)
                     )
+                    print("batch size",batch_sizes)
                     for size in batch_sizes:
                         batchData = self.client.recv(size)
 
@@ -92,7 +99,7 @@ class Network:
 
         except Exception as e:
             print("error while recieving:", e)
-            print(data)
+            # print(data)
             return False
 
     def send_huge(self, data_bytes, fn=lambda: None):
